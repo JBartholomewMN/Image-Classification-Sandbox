@@ -1,3 +1,4 @@
+from os import pipe2
 import torch
 import torch.nn as nn
 import yaml
@@ -132,21 +133,43 @@ class YoloV3(nn.Module):
 
         self.backbone = Backbone(cfg)
 
-        # build the predictors
-        self.scaled_preds = nn.ModuleList([
-
-        ])
+        # build the predictors for each res layer where the output is True
+        # in the config file...
+        predictors = list()
+        nchans = 0
+        for l in reversed(list(filter(lambda x: x[0] == "res" and x[-1], cfg["layers"].values()))):
+            _, _, outchans, _, _, _ = l
+            nchans += outchans[-1]
+            predictors += [ScalePrediction(nchans, cfg["nclasses"], cfg["nanchors"], cfg["nbbvals"])]
+        self.predictors = nn.ModuleList(predictors)
 
     def forward(self, x):
         # get the feature maps from the backbone
-        extractions = self.backbone(x)
+        # arrange them from coarsest spacial to finest spatial
+        # aka deepest to shallowest
+        extractions = reversed(self.backbone(x))
 
         # put each feature map through a scaled predictor
+        # this is where the upsampling happens for now
+        outputs = list()
+        upsample = nn.Upsample(scale_factor=2)
+        catted = None
+        for ext, pred in zip(extractions, self.predictors):
+            
+            if catted is not None:
+                catted = torch.cat((upsample(catted), ext), dim=1)
+            else:
+                catted = ext
+
+            outputs.append(pred(catted))
+
+        return outputs
 
 
 if __name__ == "__main__":
     # a little bit of test code
     model = YoloV3()
-    test_data = torch.randn(1, 3, 608, 608)
+    model.to('cuda')
+    test_data = torch.randn(5, 3, 608, 608).to('cuda')
     d = model.forward(test_data)
     print(d)
