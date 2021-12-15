@@ -170,6 +170,7 @@ if __name__ == "__main__":
     # a little bit of test code
     model = YoloV3()
     model.to('cuda')
-    test_data = torch.randn(5, 3, 608, 608).to('cuda')
+    test_data = torch.randn(10, 3, 416, 416).to('cuda')
     d = model.forward(test_data)
-    print(d)
+    for out in d:
+        print('output_shape:', out.shape)
