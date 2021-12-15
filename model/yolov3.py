@@ -124,7 +124,7 @@ class Backbone(nn.Module):
         return saved_outputs
 
 class YoloV3(nn.Module):
-    def __init__(self, config="config.yaml"):
+    def __init__(self, config="config/config.yaml"):
         super(YoloV3, self).__init__()
 
         # load config data from yaml

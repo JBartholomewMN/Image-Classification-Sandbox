@@ -4,7 +4,7 @@
 
 ### Why do this at all? 
 
-I wanted to write YOLOv3 from scrath to learn the gritty details.
+I wanted to write YOLOv3 from scratch to learn the gritty details.
 
 ### Who is this for?
 
