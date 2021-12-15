@@ -133,8 +133,8 @@ class YoloV3(nn.Module):
 
         self.backbone = Backbone(cfg)
 
-        # build the predictors for each res layer where the output is True
-        # in the config file...
+        # build the predictors at different scales.
+        # uses the boolean in res layers from the config file...
         predictors = list()
         nchans = 0
         for l in reversed(list(filter(lambda x: x[0] == "res" and x[-1], cfg["layers"].values()))):
@@ -169,6 +169,7 @@ class YoloV3(nn.Module):
 if __name__ == "__main__":
     # a little bit of test code
     model = YoloV3()
+    print(model)
     model.to('cuda')
     test_data = torch.randn(10, 3, 416, 416).to('cuda')
     d = model.forward(test_data)
