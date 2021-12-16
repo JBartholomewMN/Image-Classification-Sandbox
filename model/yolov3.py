@@ -168,7 +168,7 @@ class YoloV3(nn.Module):
             x[:, :, :, :, 1:3] = torch.sigmoid(x[:, :, :, :, 1:3])
 
             # exponeniate the h, w scale
-            x[:, :, :, :, 1:3] = torch.exp(x[:, :, :, :, 3:5])
+            x[:, :, :, :, 3:5] = torch.exp(x[:, :, :, :, 3:5])
 
             outputs.append(x)
 
