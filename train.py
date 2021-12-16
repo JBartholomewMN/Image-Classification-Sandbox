@@ -14,14 +14,17 @@ def collate_fn(batch):
 
 def train(model, optimizer, criterion, trainloader, testloader, epochs, device, cfg):
     for epoch in range(epochs):
-        for X, y in trainloader:
-            X = torch.stack(X).to(device)
+        for img, boxes, labels in trainloader:
+            X = torch.stack(img).to(device)
             optimizer.zero_grad()
 
             predictions = model(X)
-            # compute the loss over every output head...
+            # compute the loss over every output scale...
             loss = torch.sum(
-                [criterion(p, y, anch) for p, anch in zip(predictions, cfg["anchors"])]
+                [
+                    criterion(p, boxes, labels, anch, cfg)
+                    for p, anch in zip(predictions, cfg["anchors"])
+                ]
             )
 
 

@@ -24,7 +24,11 @@ class NormalizedCocoDetection(CocoDetection):
         img = np.moveaxis(img.detach().numpy(), 0, -1)
         transformed = self.transform(image=img, bboxes=bbs, class_labels=labels)
 
-        return torch.movedim(torch.tensor(transformed["image"]), -1, 0), (
+        transformed["bboxes"] = A.augmentations.bbox_utils.normalize_bboxes(
+            transformed["bboxes"], img.shape[0], img.shape[1]
+        )
+        return (
+            torch.movedim(torch.tensor(transformed["image"]), -1, 0),
             torch.tensor(transformed["bboxes"]),
             torch.tensor(transformed["class_labels"]),
         )
