@@ -23,7 +23,7 @@ class YoloLoss(nn.Module):
         anchors = torch.tensor(anchors)
         loss = None
         hgrid = X.shape[-3]
-        wgrid = X.shape[-4]
+        wgrid = X.shape[-2]
 
         # build a mask thats (nanchors, h, w)
         taken = torch.zeros((anchors.shape[0], hgrid, wgrid))
@@ -34,8 +34,8 @@ class YoloLoss(nn.Module):
             for box, lab in zip(boxes, labs):
 
                 # find which anchor box this object belongs to
-                y = torch.floor(box[1] * hgrid).int()
-                x = torch.floor(box[0] * wgrid).int()
+                y = torch.clip(torch.floor(box[1] * hgrid).int(), 0, hgrid - 1)
+                x = torch.clip(torch.floor(box[0] * wgrid).int(), 0, wgrid - 1)
 
                 # find the center coordinate relative to the anchor box corner
                 # for example, (xbox - xanchor_corner) / cell_width
@@ -54,6 +54,7 @@ class YoloLoss(nn.Module):
                         loss += self.lobj * self.bce(
                             pred[anch, y, x, 0:1], torch.tensor([1.0]).to(pred.device)
                         )
+                        # loss.backward()
 
                         # compute the coeffs that the network should learn
                         # which scale the predefined bounding boxes aka 'the prior'
@@ -63,10 +64,11 @@ class YoloLoss(nn.Module):
                         # coordinate loss
                         loss += self.lbox * self.mse(
                             pred[anch, y, x, 1:5],
-                            torch.tensor([xrelanchor, yrelanchor, w_coeff, h_coeff]).to(
-                                pred.device
-                            ),
+                            torch.tensor([xrelanchor, yrelanchor, w_coeff, h_coeff])
+                            .to(pred.device)
+                            .float(),
                         )
+                        # loss.backward()
 
                         # classification loss
                         loss += self.lclass * self.entropy(
@@ -78,30 +80,27 @@ class YoloLoss(nn.Module):
                                 dim=0,
                             ),
                         )
+                        # loss.backward()
 
             # now loop over all grid locations that aren't supposed to be an object
             # and determine if they should be punished
             for a, gh, gw in (taken == 0).nonzero(as_tuple=False):
-                pbox = pred[anch, gh, gw, 0:5]
+                pbox = pred[a, gh, gw, 0:5]
                 # scale the predefined anchor box
                 sbox = pbox.clone()
                 sbox[3] = pbox[3] * anchors[a][0]
                 sbox[4] = pbox[4] * anchors[a][1]
 
-                objectness = pred[anch, gh, gw, 0]
+                # punish objectness of predicted boxes
+                # which don't really overlap with any real bounding boxes
+                if (
+                    boxes.size == 0
+                    or torch.max(iou(sbox[1:], boxes.to(pred.device)))
+                    < cfg["iou_thresh"]
+                ):
+                    loss += self.lobj * self.bce(
+                        pbox[0:1], torch.tensor([0.0]).to(pred.device)
+                    )
+                    # loss.backward()
 
-                print(a, gh, gw)
-
-            # keep the best anchor, determine if it's
-            iou_anchors[iou_anchors > cfg["iou_thresh"]]
-
-            print(iou_anchors)
-
-        # no object detection loss
-
-        # box coordinate loss
-
-        # class loss
-
-        # obj = target[..., 0] == 1
-        # noobj = target[..., 0] == 0
+        return loss / X.shape[0]

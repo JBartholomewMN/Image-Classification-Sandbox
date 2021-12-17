@@ -18,14 +18,17 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
             X = torch.stack(img).to(device)
             optimizer.zero_grad()
 
-            predictions = model(X)
-            # compute the loss over every output scale...
-            loss = torch.sum(
-                [
-                    criterion(p, boxes, labels, anch, cfg)
-                    for p, anch in zip(predictions, cfg["anchors"])
-                ]
-            )
+            with torch.cuda.amp.autocast():
+                predictions = model(X)
+                loss = torch.tensor([0]).float().to(device)
+                for pred, anch in zip(predictions, cfg["anchors"]):
+                    loss += criterion(pred, boxes, labels, anch, cfg)
+
+                # loss = criterion(predictions[0], boxes, labels, cfg["anchors"][0], cfg)
+
+                loss.backward()
+                optimizer.step()
+                print(loss)
 
 
 if __name__ == "__main__":
