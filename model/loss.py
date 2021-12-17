@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from utils.utils import iou_width_height as iouwh
 from utils.utils import intersection_over_union as iou
+import time
 
 
 class YoloLoss(nn.Module):
@@ -19,6 +20,7 @@ class YoloLoss(nn.Module):
         self.lbox = torch.tensor(lbox).float()
 
     def forward(self, X, yboxes, ylabels, anchors, cfg):
+        start = time.perf_counter()
 
         anchors = torch.tensor(anchors)
         loss = None
@@ -58,8 +60,8 @@ class YoloLoss(nn.Module):
 
                         # compute the coeffs that the network should learn
                         # which scale the predefined bounding boxes aka 'the prior'
-                        w_coeff = box[2] / anchors[anch][0]
-                        h_coeff = box[3] / anchors[anch][1]
+                        w_coeff = torch.log(box[2] / anchors[anch][0] + 1e-16)
+                        h_coeff = torch.log(box[3] / anchors[anch][1] + 1e-16)
 
                         # coordinate loss
                         loss += self.lbox * self.mse(
@@ -68,7 +70,6 @@ class YoloLoss(nn.Module):
                             .to(pred.device)
                             .float(),
                         )
-                        # loss.backward()
 
                         # classification loss
                         loss += self.lclass * self.entropy(
@@ -94,7 +95,7 @@ class YoloLoss(nn.Module):
                 # punish objectness of predicted boxes
                 # which don't really overlap with any real bounding boxes
                 if (
-                    boxes.size == 0
+                    torch.numel(boxes) <= 0
                     or torch.max(iou(sbox[1:], boxes.to(pred.device)))
                     < cfg["iou_thresh"]
                 ):
@@ -102,5 +103,7 @@ class YoloLoss(nn.Module):
                         pbox[0:1], torch.tensor([0.0]).to(pred.device)
                     )
                     # loss.backward()
+
+        print("loss function took:", time.perf_counter() - start)
 
         return loss / X.shape[0]

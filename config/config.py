@@ -24,7 +24,7 @@ CFG = {
     "nanchors": 3,
     "nbbvals": 5,
     "lr": 0.001,
-    "batch_size": 3,
+    "batch_size": 16,
     "nworkers": 4,
     "epochs": 100,
     "iou_thresh": 0.5,
