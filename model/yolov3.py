@@ -130,10 +130,11 @@ class Backbone(nn.Module):
 
 
 class YoloV3(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, inference=False):
         super(YoloV3, self).__init__()
 
         self.backbone = Backbone(cfg)
+        self.inference = inference
 
         # build the predictors at different scales.
         # uses the boolean in res layers from the config file...
@@ -176,11 +177,11 @@ class YoloV3(nn.Module):
 
             x = pred(catted)
 
-            # sigmoid the x, y anchor points bounding them from 0 to 1
-            x[:, :, :, :, 1:3] = torch.sigmoid(x[:, :, :, :, 1:3])
-
-            # exponeniate the h, w scale
-            x[:, :, :, :, 3:5] = torch.exp(x[:, :, :, :, 3:5])
+            if self.inference:
+                # sigmoid the x, y anchor points bounding them from 0 to 1
+                x[:, :, :, :, 0:2] = torch.sigmoid(x[:, :, :, :, 0:2])
+                # exponeniate the h, w scale
+                x[:, :, :, :, 2:4] = torch.exp(x[:, :, :, :, 2:4])
 
             outputs.append(x)
 

@@ -9,26 +9,25 @@ from config.config import CFG
 
 
 def collate_fn(batch):
-    return tuple(zip(*batch))
+    return torch.stack([b[0] for b in batch]), torch.cat([b[1] for b in batch], dim=0)
 
 
-def train(model, optimizer, criterion, trainloader, testloader, epochs, device, cfg):
+def train(
+    model, optimizer, criterion: YoloLoss, trainloader, testloader, epochs, device, cfg
+):
     for epoch in range(epochs):
-        for img, boxes, labels in trainloader:
-            X = torch.stack(img).to(device)
+        for img_batch, label_batch in trainloader:
             optimizer.zero_grad()
 
             with torch.cuda.amp.autocast():
-                predictions = model(X)
-                loss = torch.tensor([0]).float().to(device)
-                for pred, anch in zip(predictions, cfg["anchors"]):
-                    loss += criterion(pred, boxes, labels, anch, cfg)
+                predictions = model(img_batch.to(device))
+                loss, stats = criterion(predictions, label_batch, cfg["anchors"], cfg)
 
                 # loss = criterion(predictions[0], boxes, labels, cfg["anchors"][0], cfg)
 
                 loss.backward()
                 optimizer.step()
-                print(loss)
+                print(stats)
 
 
 if __name__ == "__main__":
@@ -48,6 +47,7 @@ if __name__ == "__main__":
         shuffle=True,
         num_workers=CFG["nworkers"],
         collate_fn=collate_fn,
+        pin_memory=True,
     )
 
     criterion = YoloLoss()
