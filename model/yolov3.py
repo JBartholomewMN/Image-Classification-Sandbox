@@ -5,7 +5,13 @@ import torch.nn as nn
 
 class ResBlock(nn.Module):
     def __init__(
-        self, inchans: list, outchans: list, ksizes: list, repeats: int, store: bool
+        self,
+        inchans: list,
+        outchans: list,
+        ksizes: list,
+        repeats: int,
+        store: bool,
+        use_residual: bool = True,
     ):
         super(ResBlock, self).__init__()
         layers = list()
@@ -16,7 +22,8 @@ class ResBlock(nn.Module):
         for _ in range(repeats):
             for ic, oc, ks in zip(inchans, outchans, ksizes):
                 layers += [ConvBlock(ic, oc, ks, padding="same")]
-            self.skipind += [len(layers) - 1]
+            if use_residual:
+                self.skipind += [len(layers) - 1]
 
         self.layers = nn.ModuleList(layers)
         self.store = store
@@ -40,9 +47,9 @@ class ScalePrediction(nn.Module):
     def __init__(self, inchans, nclasses, nanchors, nbbvals):
         super(ScalePrediction, self).__init__()
         self.layers = nn.Sequential(
-            ConvBlock(inchans, 2 * inchans, ksize=3, padding=1),
+            ConvBlock(inchans, inchans // 2, ksize=3),
             ConvBlock(
-                2 * inchans, (nclasses + nbbvals) * nanchors, bnorm=False, ksize=1
+                inchans // 2, (nclasses + nbbvals) * nanchors, bnorm=False, ksize=1
             ),
         )
         self.nclasses = nclasses
@@ -142,7 +149,12 @@ class YoloV3(nn.Module):
                     nchans, cfg["nclasses"], cfg["nanchors"], cfg["nbbvals"]
                 )
             ]
-        self.predictors = nn.ModuleList(predictors)
+            self.predictors = nn.ModuleList(predictors)
+        print("total parameters: ", sum(p.numel() for p in self.parameters()))
+        print(
+            "trainanble parameters: ",
+            sum(p.numel() for p in self.parameters() if p.requires_grad),
+        )
 
     def forward(self, x):
         # get the feature maps from the backbone
