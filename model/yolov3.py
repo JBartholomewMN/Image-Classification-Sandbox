@@ -130,12 +130,11 @@ class Backbone(nn.Module):
 
 
 class YoloV3(nn.Module):
-    def __init__(self, cfg, inference=False):
+    def __init__(self, cfg):
         super(YoloV3, self).__init__()
 
         self.backbone = Backbone(cfg)
-        self.inference = inference
-
+        self.anchors = torch.tensor(cfg["anchors"]).to(cfg["device"])
         # build the predictors at different scales.
         # uses the boolean in res layers from the config file...
         predictors = list()
@@ -168,7 +167,7 @@ class YoloV3(nn.Module):
         outputs = list()
         upsample = nn.Upsample(scale_factor=2)
         catted = None
-        for ext, pred in zip(extractions, self.predictors):
+        for ext, pred, anch in zip(extractions, self.predictors, self.anchors):
 
             if catted is not None:
                 catted = torch.cat((upsample(catted), ext), dim=1)
@@ -177,15 +176,33 @@ class YoloV3(nn.Module):
 
             x = pred(catted)
 
-            if self.inference:
-                # sigmoid the x, y anchor points bounding them from 0 to 1
-                x[:, :, :, :, 0:2] = torch.sigmoid(x[:, :, :, :, 0:2])
+            if not self.training:
+                # sigmoid the x, y (relative to anchor box corner) bounding them from 0 to 1
+                # then move them out of grid space
+                ny, nx = x.shape[2:4]
+                grid = self._make_grid(nx, ny).to(x.device)
+                x[..., 0:2] = torch.sigmoid(x[..., 0:2]) + grid
+                x[..., 0] /= nx
+                x[..., 1] /= ny
+
+                # sigmoid the objectness score [0, 1]
+                x[..., 4] = torch.sigmoid(x[..., 4])
+
                 # exponeniate the h, w scale
-                x[:, :, :, :, 2:4] = torch.exp(x[:, :, :, :, 2:4])
+                # then apply the scaling to the anchor boxs
+                x[..., 2:4] = (torch.exp(x[..., 2:4]).movedim(1, -2) * anch).movedim(
+                    -2, 1
+                )
+                x = x.reshape(x.shape[0], -1, x.shape[-1])
 
             outputs.append(x)
 
-        return outputs
+        return torch.cat(outputs, 1) if not self.training else outputs
+
+    @staticmethod
+    def _make_grid(nx=20, ny=20):
+        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing="ij")
+        return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
 
 
 if __name__ == "__main__":

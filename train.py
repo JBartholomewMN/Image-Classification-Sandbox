@@ -6,6 +6,8 @@ import torchvision.transforms.functional as F
 import torchvision.transforms as transforms
 import torch.nn as nn
 from config.config import CFG
+import tqdm
+from model.eval import _evaluate
 
 
 def collate_fn(batch):
@@ -15,8 +17,12 @@ def collate_fn(batch):
 def train(
     model, optimizer, criterion: YoloLoss, trainloader, testloader, epochs, device, cfg
 ):
+
     for epoch in range(epochs):
-        for img_batch, label_batch in trainloader:
+        for i, (img_batch, label_batch) in enumerate(
+            tqdm.tqdm(trainloader, desc=f"Training Epoch {epoch}")
+        ):
+            model.train()
             optimizer.zero_grad()
 
             with torch.cuda.amp.autocast():
@@ -27,7 +33,21 @@ def train(
 
                 loss.backward()
                 optimizer.step()
-                print(stats)
+                # print(stats)
+
+            if i > 0 and i % 250 == 0:
+                model.eval()
+                with torch.no_grad():
+                    metrics = _evaluate(
+                        model,
+                        testloader,
+                        [str(i) for i in range(cfg["nclasses"])],
+                        cfg["size"][0],
+                        cfg["iou_thresh"],
+                        cfg["conf_thresh"],
+                        cfg["nms_thresh"],
+                        True,
+                    )
 
 
 if __name__ == "__main__":
@@ -50,13 +70,28 @@ if __name__ == "__main__":
         pin_memory=True,
     )
 
+    coco_test_data = NormalizedCocoDetection(
+        CFG["A_transforms"],
+        "dataset/val2017/",
+        "dataset/annotations_trainval2017/annotations/instances_val2017.json",
+        transform=CFG["T_transforms"],
+    )
+    testloader = torch.utils.data.DataLoader(
+        coco_test_data,
+        batch_size=CFG["batch_size"],
+        shuffle=True,
+        num_workers=CFG["nworkers"],
+        collate_fn=collate_fn,
+        pin_memory=True,
+    )
+
     criterion = YoloLoss()
     train(
         model,
         optimizer,
         criterion,
         trainloader,
-        None,
+        testloader,
         CFG["epochs"],
         CFG["device"],
         CFG,

@@ -1,8 +1,6 @@
 from numpy import histogram_bin_edges
 import torch
 import torch.nn as nn
-from utils.utils import iou_width_height as iouwh
-from utils.utils import intersection_over_union as iou
 import time
 import math
 

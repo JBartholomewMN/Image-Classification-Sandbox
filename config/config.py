@@ -28,6 +28,8 @@ CFG = {
     "nworkers": 1,
     "epochs": 100,
     "iou_thresh": 0.5,
+    "conf_thresh": 0.6,
+    "nms_thresh": 0.3,
     "checkpoint_file": "checkpoint.pth.tar",
     "anchors": [
         [[0.28, 0.22], [0.38, 0.48], [0.90, 0.78]],
