@@ -1,6 +1,110 @@
 from os import pipe2
 import torch
 import torch.nn as nn
+import math
+
+
+def positionalencoding2d(d_model, height, width):
+    """
+    :param d_model: dimension of the model
+    :param height: height of the positions
+    :param width: width of the positions
+    :return: d_model*height*width position matrix
+    """
+    if d_model % 4 != 0:
+        raise ValueError(
+            "Cannot use sin/cos positional encoding with "
+            "odd dimension (got dim={:d})".format(d_model)
+        )
+    pe = torch.zeros(d_model, height, width)
+    # Each dimension use half of d_model
+    d_model = int(d_model / 2)
+    div_term = torch.exp(torch.arange(0.0, d_model, 2) * -(math.log(10000.0) / d_model))
+    pos_w = torch.arange(0.0, width).unsqueeze(1)
+    pos_h = torch.arange(0.0, height).unsqueeze(1)
+    pe[0:d_model:2, :, :] = (
+        torch.sin(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
+    )
+    pe[1:d_model:2, :, :] = (
+        torch.cos(pos_w * div_term).transpose(0, 1).unsqueeze(1).repeat(1, height, 1)
+    )
+    pe[d_model::2, :, :] = (
+        torch.sin(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
+    )
+    pe[d_model + 1 :: 2, :, :] = (
+        torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
+    )
+    return pe
+
+
+class ConvFormer(nn.Module):
+    def __init__(
+        self,
+        inchans: list,
+        kqvchans: list,
+        nheads: list,
+        hiddensize: int,
+        outchans: int,
+        repeats: int,
+        store: bool,
+    ):
+        super(ConvFormer, self).__init__()
+        layers = list()
+
+        self.ks = nn.ModuleList(
+            [
+                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                for _ in range(nheads)
+            ]
+        )
+        self.qs = nn.ModuleList(
+            [
+                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                for _ in range(nheads)
+            ]
+        )
+        self.vs = nn.ModuleList(
+            [
+                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                for _ in range(nheads)
+            ]
+        )
+        self.sm = nn.Softmax2d()
+
+        self.ll = nn.Linear(nheads * kqvchans, inchans)
+        self.leaky = nn.LeakyReLU(0.1)
+        self.bn = nn.BatchNorm2d(inchans)
+        self.inchans = inchans
+        self.outchans = outchans
+
+    def forward(self, x):
+
+        pos_encoding = positionalencoding2d(self.inchans, x.shape[-2], x.shape[-1]).to(
+            x.device
+        )
+        x = x + pos_encoding
+        ks = (
+            torch.stack([k(x) for k in self.ks])
+            .flatten(start_dim=-2)
+            .permute(1, 0, 3, 2)
+        )
+        qs = (
+            torch.stack([q(x) for q in self.qs])
+            .flatten(start_dim=-2)
+            .permute(1, 0, 2, 3)
+        )
+        vs = (
+            torch.stack([v(x) for v in self.vs])
+            .flatten(start_dim=-2)
+            .permute(1, 0, 3, 2)
+        )
+
+        kqt = torch.matmul(ks, qs) / ks.shape[-2]
+        sm = self.sm(kqt)
+        att = torch.matmul(sm, vs).permute(0, 2, 3, 1).flatten(start_dim=-2)
+        projed = self.leaky(self.ll(att)).permute(0, 2, 1).reshape(x.shape)
+
+        return self.bn(projed)
 
 
 class ResBlock(nn.Module):
@@ -27,6 +131,7 @@ class ResBlock(nn.Module):
 
         self.layers = nn.ModuleList(layers)
         self.store = store
+        self.outchans = outchans[-1]
 
     def forward(self, x):
 
@@ -84,6 +189,7 @@ class ConvBlock(nn.Module):
             layers.append(nn.LeakyReLU(0.1))
 
         self.layers = nn.ModuleList(layers)
+        self.outchans = outchans
 
     def forward(self, x):
         for l in self.layers:
@@ -113,11 +219,23 @@ class Backbone(nn.Module):
             elif v[0] == "res":
                 _, inchans, outchans, ksize, repeats, store = v
                 layers += [ResBlock(inchans, outchans, ksize, repeats, store)]
+            elif v[0] == "convformer":
+                # ["convtrans", inchans, kqvchans, nheads, hiddensize, repeats, store_output]
+                _, inchans, kqvchans, nheads, hiddensize, outchans, repeats, store = v
+                layers += [
+                    ConvFormer(
+                        inchans, kqvchans, nheads, hiddensize, outchans, repeats, store
+                    )
+                ]
 
         self.layers = nn.ModuleList(layers)
 
         if weights is not None:
             pass
+
+        # used if in classifier mode:
+        self.classifier = False
+        self.nclasses = cfg["nclasses"]
 
     def forward(self, x):
         saved_outputs = list()
@@ -126,7 +244,25 @@ class Backbone(nn.Module):
             if hasattr(l, "store") and l.store:
                 saved_outputs += [x]
 
-        return saved_outputs
+        if not self.classifier:
+            return
+        else:
+            x = self.conv_class_layer(x)
+            x = self.rl(x)
+            x = torch.mean(x, (-1, -2))
+            x = self.fc(x)
+            if not self.training:
+                x = self.sm(x)
+            return x
+
+    def add_classifier(self):
+        self.classifier = True
+        self.conv_class_layer = nn.Conv2d(
+            self.layers[-1].outchans, self.nclasses, 1, padding="same"
+        )
+        self.rl = nn.LeakyReLU()
+        self.fc = nn.Linear(self.nclasses, self.nclasses)
+        self.sm = nn.Softmax(-1)
 
 
 class YoloV3(nn.Module):

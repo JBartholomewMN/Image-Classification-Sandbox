@@ -30,7 +30,14 @@ def print_eval_stats(metrics_output, class_names, verbose):
 
 
 def _evaluate(
-    model, dataloader, class_names, img_size, iou_thres, conf_thres, nms_thres, verbose
+    model,
+    dataloader,
+    class_names,
+    img_size,
+    iou_thres,
+    conf_thres,
+    nms_thres,
+    verbose,
 ):
     """Evaluate model on validation dataset.
     :param model: Model to evaluate

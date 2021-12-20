@@ -33,15 +33,15 @@ def train(
 
                 loss.backward()
                 optimizer.step()
-                # print(stats)
+                print(stats)
 
-            if i > 0 and i % 250 == 0:
+            if i > 0 and i % 100 == 0:
                 model.eval()
                 with torch.no_grad():
                     metrics = _evaluate(
                         model,
                         testloader,
-                        [str(i) for i in range(cfg["nclasses"])],
+                        [i for i in range(cfg["nclasses"])],
                         cfg["size"][0],
                         cfg["iou_thresh"],
                         cfg["conf_thresh"],
