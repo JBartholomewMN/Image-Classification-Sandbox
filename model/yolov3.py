@@ -257,14 +257,14 @@ class Backbone(nn.Module):
                 x = self.sm(x)
             return x
 
-    def add_classifier(self):
-        self.classifier = True
-        self.conv_class_layer = nn.Conv2d(
-            self.layers[-1].outchans, self.nclasses, 1, padding="same"
+    def add_classifier(cls):
+        cls.classifier = True
+        cls.conv_class_layer = nn.Conv2d(
+            cls.layers[-1].outchans, cls.nclasses, 1, padding="same"
         )
-        self.rl = nn.LeakyReLU()
-        self.fc = nn.Linear(self.nclasses, self.nclasses)
-        self.sm = nn.Softmax(-1)
+        cls.rl = nn.LeakyReLU()
+        cls.fc = nn.Linear(cls.nclasses, cls.nclasses)
+        cls.sm = nn.Softmax(-1)
 
 
 class YoloV3(nn.Module):

@@ -5,7 +5,7 @@ import torch
 import torchvision.transforms.functional as F
 import torchvision.transforms as transforms
 import torch.nn as nn
-from config.config import CFG
+from config.default import CFG
 import tqdm
 from model.eval import _evaluate
 

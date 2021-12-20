@@ -3,8 +3,17 @@ from albumentations.pytorch import ToTensorV2
 import torchvision.transforms as transforms
 import torch
 from torchvision.transforms.transforms import ToTensor
+from dataset.imagenet import ImageNetClassifcation
+from model.yolov3 import Backbone
 
-DATASET = "imagenet"
+
+def collate_fn(batch):
+    return (
+        torch.stack([b[0] for b in batch]),
+        torch.tensor([b[1] for b in batch]),
+    )
+
+
 CFG = {
     "device": "cuda" if torch.cuda.is_available() else "cpu",
     # "layers": {
@@ -48,19 +57,11 @@ CFG = {
         10: ["conv", 512, 1024, 3, 2],
         11: ["convformer", 1024, 96, 8, 1024, 1024, 1, True],
     },
-    "nclasses": 1000,
     "nanchors": 3,
     "nbbvals": 5,
-    "lr": 0.01,
-    "momentum": 0.9,
-    "weight_decay": 0.001,
-    "batch_size": 16,
-    "nworkers": 4,
-    "epochs": 100,
     "iou_thresh": 0.5,
     "conf_thresh": 0.5,
     "nms_thresh": 0.3,
-    "checkpoint_file": "checkpoint.pth.tar",
     "anchors": [
         [[0.28, 0.22], [0.38, 0.48], [0.90, 0.78]],
         [[0.07, 0.15], [0.15, 0.11], [0.14, 0.29]],
@@ -86,4 +87,44 @@ CFG = {
             ToTensorV2(),
         ]
     ),
+    "A_transforms_test": A.Compose(
+        [
+            A.Normalize(),
+            A.HorizontalFlip(p=0.5),
+            A.ShiftScaleRotate(
+                shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5
+            ),
+            A.Resize(416, 416),
+            A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
+            A.RandomBrightnessContrast(p=0.5),
+            ToTensorV2(),
+        ]
+    ),
+    "optimizer": torch.optim.SGD,
+    "optimizer_args": {"lr": 0.01, "momentum": 0.9, "weight_decay": 0.0005},
+    "dataset": ImageNetClassifcation,
+    "trainset_args": {"root": "dataset/data/imagenet_train/"},
+    "trainloader": torch.utils.data.DataLoader,
+    "testloader": torch.utils.data.DataLoader,
+    "trainloader_args": {
+        "batch_size": 12,
+        "shuffle": True,
+        "num_workers": 4,
+        "collate_fn": collate_fn,
+        "pin_memory": True,
+    },
+    "testset_args": {"root": "dataset/data/imagenet_test/", "split": "val"},
+    "testloader_args": {
+        "batch_size": 12,
+        "shuffle": True,
+        "num_workers": 4,
+        "collate_fn": collate_fn,
+        "pin_memory": True,
+    },
+    "epochs": 100,
+    "nclasses": 1000,
+    "model": Backbone,
+    "model_inits": [Backbone.add_classifier],
+    "weights_save_path": "mybest.pt",
+    "criterion": torch.nn.CrossEntropyLoss(),
 }

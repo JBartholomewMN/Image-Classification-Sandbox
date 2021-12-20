@@ -1,31 +1,29 @@
-from dataset.imagenet import ImageNetClassifcation
+from typing import Optional
 from model.yolov3 import Backbone
-
 import torch
 import torchvision.transforms.functional as F
 import torchvision.transforms as transforms
 import torch.nn.functional
 import torch.nn as nn
-from config.config import CFG
 import tqdm
 from model.eval import _evaluate
 import torchmetrics
-
-
-def collate_fn(batch):
-    return (
-        torch.stack([b[0] for b in batch]),
-        torch.tensor([b[1] for b in batch]),
-    )
+import importlib.util
+import argparse
+import os
+from config.build_config import build_config
 
 
 def train(model, optimizer, criterion, trainloader, testloader, epochs, device, cfg):
 
-    best_acc = 0
-    model.train()
-    metric = torchmetrics.Accuracy()
+    top1accbest = 0
+    top5accbest = 0
+    t1metric = torchmetrics.Accuracy()
+    t5metric = torchmetrics.Accuracy(top_k=5)
     running_loss = 0.0
+
     for epoch in range(epochs):
+        model.train()
         for i, (img_batch, label_batch) in enumerate(
             tqdm.tqdm(trainloader, desc=f"Training Epoch {epoch}")
         ):
@@ -44,66 +42,93 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
                 print("[%d, %5d] loss: %.3f" % (epoch + 1, i + 1, running_loss / 100))
                 running_loss = 0.0
 
+        model.eval()
         for timgb, tlabs in tqdm.tqdm(testloader, desc="Testing"):
             with torch.no_grad():
-                acc = metric(model(timgb.to(device)).detach().cpu(), tlabs)
+                preds = model(timgb.to(device)).detach().cpu()
+                acc1 = t1metric(preds, tlabs)
+                acc5 = t5metric(preds, tlabs)
 
-        acc = metric.compute()
-        print("accuracy: ", acc)
+        acc1 = acc1.compute()
+        acc5 = acc5.compute()
+        print("Top-1 accuracy: ", acc1)
+        print("Top-5 accuracy: ", acc5)
 
-        if acc > best_acc:
-            best_acc = acc
-            torch.save(model.state_dict(), "best.pt")
+        if acc1 > best_acc:
+            best_acc = acc1
+            torch.save(model.state_dict(), cfg["weights_save_path"])
 
 
 if __name__ == "__main__":
 
-    model = Backbone(CFG)
-    model.add_classifier()
-    model = model.to(CFG["device"])
-    print("model has %d params" % sum(p.numel() for p in model.parameters()))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="path to configuration (.json) file")
+    args = parser.parse_args()
+    CFG = None
+    if args.config is not None:
+        s = importlib.util.spec_from_file_location("", os.path.abspath(args.config))
+        confmod = importlib.util.module_from_spec(s)
+        s.loader.exec_module(confmod)
+        CFG = dict(confmod.CFG)
 
-    optimizer = torch.optim.SGD(
-        model.parameters(), lr=CFG["lr"], momentum=CFG["momentum"]
-    )
+    train(*build_config(CFG))
+    # model = Backbone(CFG)
+    # model.add_classifier()
+    # model = model.to(CFG["device"])
+    # print("model has %d params" % sum(p.numel() for p in model.parameters()))
 
-    im_train_data = ImageNetClassifcation(
-        atransforms=CFG["A_transforms"],
-        root="dataset/data/imagenet_train",
-        transform=CFG["T_transforms"],
-    )
-    trainloader = torch.utils.data.DataLoader(
-        im_train_data,
-        batch_size=CFG["batch_size"],
-        shuffle=True,
-        num_workers=CFG["nworkers"],
-        collate_fn=collate_fn,
-        pin_memory=True,
-    )
+    # train(
+    #     model,
+    #     optimizer,
+    #     criterion,
+    #     trainloader,
+    #     testloader,
+    #     CFG["epochs"],
+    #     CFG["device"],
+    #     CFG,
+    # )
 
-    im_test_data = ImageNetClassifcation(
-        atransforms=CFG["A_transforms"],
-        root="dataset/data/imagenet_test",
-        transform=CFG["T_transforms"],
-        split="val",
-    )
-    testloader = torch.utils.data.DataLoader(
-        im_test_data,
-        batch_size=CFG["batch_size"],
-        shuffle=True,
-        num_workers=CFG["nworkers"],
-        collate_fn=collate_fn,
-        pin_memory=True,
-    )
+    # optimizer = torch.optim.SGD(
+    #     model.parameters(), lr=CFG["lr"], momentum=CFG["momentum"]
+    # )
 
-    criterion = torch.nn.CrossEntropyLoss()
-    train(
-        model,
-        optimizer,
-        criterion,
-        trainloader,
-        testloader,
-        CFG["epochs"],
-        CFG["device"],
-        CFG,
-    )
+    # im_train_data = ImageNetClassifcation(
+    #     atransforms=CFG["A_transforms"],
+    #     root="dataset/data/imagenet_train",
+    #     transform=CFG["T_transforms"],
+    # )
+    # trainloader = torch.utils.data.DataLoader(
+    #     im_train_data,
+    #     batch_size=CFG["batch_size"],
+    #     shuffle=True,
+    #     num_workers=CFG["nworkers"],
+    #     collate_fn=collate_fn,
+    #     pin_memory=True,
+    # )
+
+    # im_test_data = ImageNetClassifcation(
+    #     atransforms=CFG["A_transforms"],
+    #     root="dataset/data/imagenet_test",
+    #     transform=CFG["T_transforms"],
+    #     split="val",
+    # )
+    # testloader = torch.utils.data.DataLoader(
+    #     im_test_data,
+    #     batch_size=CFG["batch_size"],
+    #     shuffle=True,
+    #     num_workers=CFG["nworkers"],
+    #     collate_fn=collate_fn,
+    #     pin_memory=True,
+    # )
+
+    # criterion = torch.nn.CrossEntropyLoss()
+    # train(
+    #     model,
+    #     optimizer,
+    #     criterion,
+    #     trainloader,
+    #     testloader,
+    #     CFG["epochs"],
+    #     CFG["device"],
+    #     CFG,
+    # )
