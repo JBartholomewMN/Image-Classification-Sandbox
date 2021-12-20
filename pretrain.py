@@ -1,4 +1,4 @@
-from dataset.imagenet import ImageNetClassifcation
+from dataset.stl10 import STL10Classifcation
 from model.yolov3 import Backbone
 
 import torch
@@ -67,10 +67,11 @@ if __name__ == "__main__":
         model.parameters(), lr=CFG["lr"], momentum=CFG["momentum"]
     )
 
-    im_train_data = ImageNetClassifcation(
+    im_train_data = STL10Classifcation(
         atransforms=CFG["A_transforms"],
-        root="dataset/data/imagenet_train",
+        root="dataset/data/",
         transform=CFG["T_transforms"],
+        split="train"
     )
     trainloader = torch.utils.data.DataLoader(
         im_train_data,
@@ -81,11 +82,11 @@ if __name__ == "__main__":
         pin_memory=True,
     )
 
-    im_test_data = ImageNetClassifcation(
-        atransforms=CFG["A_transforms"],
-        root="dataset/data/imagenet_test",
+    im_test_data = STL10Classifcation(
+        atransforms=CFG["test_Atransforms"],
+        root="dataset/data/",
         transform=CFG["T_transforms"],
-        split="val",
+        split="test",
     )
     testloader = torch.utils.data.DataLoader(
         im_test_data,
