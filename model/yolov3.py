@@ -101,10 +101,12 @@ class ConvFormer(nn.Module):
 
         kqt = torch.matmul(ks, qs) / ks.shape[-2]
         sm = self.sm(kqt)
-        att = torch.matmul(sm, vs).permute(0, 2, 3, 1).flatten(start_dim=-2)
-        projed = self.leaky(self.ll(att)).permute(0, 2, 1).reshape(x.shape)
+        att = torch.matmul(sm, vs).permute(0, 2, 3, 1)
+        att = att.flatten(start_dim=-2)
+        projed = self.leaky(self.ll(att)).permute(0, 2, 1)
+        projed = projed.reshape(x.shape)
 
-        return self.bn(projed)
+        return self.bn(projed + x)
 
 
 class ResBlock(nn.Module):
