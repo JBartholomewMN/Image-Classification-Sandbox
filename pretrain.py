@@ -49,14 +49,18 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
                 acc1 = t1metric(preds, tlabs)
                 acc5 = t5metric(preds, tlabs)
 
-        acc1 = acc1.compute()
-        acc5 = acc5.compute()
-        print("Top-1 accuracy: ", acc1)
-        print("Top-5 accuracy: ", acc5)
+        acc1 = t1metric.compute()
+        acc5 = t5metric.compute()
 
-        if acc1 > best_acc:
-            best_acc = acc1
+        if acc1 > top1accbest:
+            top1accbest = acc1
+            top5accbest = acc5
             torch.save(model.state_dict(), cfg["weights_save_path"])
+
+        print("Epoch Top-1 accuracy: ", acc1)
+        print("Epoch Top-5 accuracy: ", acc5)
+        print("Best  Top-1 accuracy: ", top1accbest)
+        print("Best  Top-5 accuracy: ", top5accbest)
 
 
 if __name__ == "__main__":
