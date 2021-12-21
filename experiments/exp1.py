@@ -3,6 +3,7 @@ from albumentations.pytorch import ToTensorV2
 import torchvision.transforms as transforms
 import torch
 from torchvision.transforms.transforms import ToTensor
+from dataset.coco_dataset import CocoDetection
 from dataset.imagenet import ImageNetClassifcation
 from model.yolov3 import Backbone
 
@@ -31,15 +32,31 @@ CFG = {
     #     10: ["conv", 512, 1024, 3, 2],
     #     11: ["res", [1024, 512], [512, 1024], [1, 3], 4, True],
     # },
+    # "layers": {
+    #     # if conv: ["conv", inchans, outchans, ksize, stride]
+    #     # if res: ["res", [inchans...], [outchans...], [ksizes...], repeats, store_output]
+    #     1: ["conv", 3, 32, 3, 1],
+    #     2: ["conv", 32, 64, 3, 2],
+    #     4: ["conv", 64, 128, 3, 2],
+    #     6: ["conv", 128, 256, 3, 2],
+    #     8: ["conv", 256, 512, 3, 2],
+    #     10: ["conv", 512, 1024, 3, 2],
+    # },
     "layers": {
         # if conv: ["conv", inchans, outchans, ksize, stride]
         # if res: ["res", [inchans...], [outchans...], [ksizes...], repeats, store_output]
+        # if convtrans: ["convtrans", inchans, kqvchans, nheads, hiddensize, outsize, repeats, store_output]
         1: ["conv", 3, 32, 3, 1],
         2: ["conv", 32, 64, 3, 2],
+        3: ["res", [64, 32], [32, 64], [1, 3], 1, False],
         4: ["conv", 64, 128, 3, 2],
+        5: ["res", [128, 64], [64, 128], [1, 3], 2, False],
         6: ["conv", 128, 256, 3, 2],
+        7: ["res", [256, 128], [128, 256], [1, 3], 8, True],
         8: ["conv", 256, 512, 3, 2],
+        9: ["convformer", 512, 96, 8, 512, 512, 1, True],
         10: ["conv", 512, 1024, 3, 2],
+        11: ["convformer", 1024, 96, 8, 1024, 1024, 1, True],
     },
     "nanchors": 3,
     "nbbvals": 5,
@@ -74,13 +91,7 @@ CFG = {
     "A_transforms_test": A.Compose(
         [
             A.Normalize(),
-            A.HorizontalFlip(p=0.5),
-            A.ShiftScaleRotate(
-                shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5
-            ),
             A.Resize(416, 416),
-            A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
-            A.RandomBrightnessContrast(p=0.5),
             ToTensorV2(),
         ]
     ),
