@@ -12,6 +12,10 @@ def build_config(config=CFG):
         m(config["model"])
 
     config["model"] = config["model"].to(config["device"])
+    print(
+        "trainable params: ",
+        sum(p.numel() for p in config["model"].parameters() if p.requires_grad),
+    )
 
     # optimizer
     config["optimizer"] = config["optimizer"](

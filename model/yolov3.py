@@ -1,7 +1,11 @@
 from os import pipe2
+from cv2 import add
 import torch
 import torch.nn as nn
 import math
+import time
+
+from torch.nn.functional import layer_norm
 
 
 def positionalencoding2d(d_model, height, width):
@@ -11,6 +15,7 @@ def positionalencoding2d(d_model, height, width):
     :param width: width of the positions
     :return: d_model*height*width position matrix
     """
+
     if d_model % 4 != 0:
         raise ValueError(
             "Cannot use sin/cos positional encoding with "
@@ -34,55 +39,60 @@ def positionalencoding2d(d_model, height, width):
     pe[d_model + 1 :: 2, :, :] = (
         torch.cos(pos_h * div_term).transpose(0, 1).unsqueeze(2).repeat(1, 1, width)
     )
+
     return pe
 
 
+# ["convtrans", inchans, kqvchans, kernsize, nheads, store_output]
 class ConvFormer(nn.Module):
     def __init__(
         self,
-        inchans: list,
-        kqvchans: list,
-        nheads: list,
-        hiddensize: int,
-        outchans: int,
-        repeats: int,
+        inchans: int,
+        kqvchans: int,
+        kernsize: int,
+        nheads: int,
         store: bool,
     ):
         super(ConvFormer, self).__init__()
-        layers = list()
+        self.store = store
 
         self.ks = nn.ModuleList(
             [
-                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                nn.Conv2d(inchans, kqvchans, kernel_size=kernsize, padding="same")
                 for _ in range(nheads)
             ]
         )
         self.qs = nn.ModuleList(
             [
-                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                nn.Conv2d(inchans, kqvchans, kernel_size=kernsize, padding="same")
                 for _ in range(nheads)
             ]
         )
         self.vs = nn.ModuleList(
             [
-                nn.Conv2d(inchans, kqvchans, kernel_size=1, padding="same")
+                nn.Conv2d(inchans, kqvchans, kernel_size=kernsize, padding="same")
                 for _ in range(nheads)
             ]
         )
         self.sm = nn.Softmax2d()
-
-        self.ll = nn.Linear(nheads * kqvchans, inchans)
+        self.ln = nn.LayerNorm(inchans)
+        self.projheads = nn.Linear(nheads * kqvchans, inchans)
+        self.ff1 = nn.Linear(inchans, inchans)
+        self.ff2 = nn.Linear(inchans, inchans)
         self.leaky = nn.LeakyReLU(0.1)
-        self.bn = nn.BatchNorm2d(inchans)
         self.inchans = inchans
-        self.outchans = outchans
+        self.outchans = inchans
 
     def forward(self, x):
 
         pos_encoding = positionalencoding2d(self.inchans, x.shape[-2], x.shape[-1]).to(
             x.device
         )
+
+        inshape = x.shape
         x = x + pos_encoding
+        xflattened = x.flatten(start_dim=-2).permute(0, 2, 1)
+
         ks = (
             torch.stack([k(x) for k in self.ks])
             .flatten(start_dim=-2)
@@ -99,12 +109,68 @@ class ConvFormer(nn.Module):
             .permute(1, 0, 3, 2)
         )
 
+        # scaled dot product attention
         kqt = torch.matmul(ks, qs) / ks.shape[-2]
         sm = self.sm(kqt)
         att = torch.matmul(sm, vs).permute(0, 2, 3, 1)
         att = att.flatten(start_dim=-2)
-        projed = self.leaky(self.ll(att)).permute(0, 2, 1)
-        projed = projed.reshape(x.shape)
+        attprojed = self.projheads(att)
+
+        # add and norm
+        addnormed = self.ln(xflattened + attprojed)
+
+        # feedforward
+        ffed = self.ff1(addnormed)
+        ffed = self.leaky(ffed)
+        ffed = self.ff2(ffed)
+        ffed = self.ln(xflattened + addnormed)
+
+        return ffed.permute(0, 2, 1).reshape(inshape)
+
+
+class Transformer(nn.Module):
+    def __init__(
+        self,
+        inchans: list,
+        kqvchans: list,
+        nheads: list,
+        store: bool,
+    ):
+        super(Transformer, self).__init__()
+        layers = list()
+
+        self.ks = nn.ModuleList([nn.Linear(inchans, kqvchans) for _ in range(nheads)])
+        self.qs = nn.ModuleList([nn.Linear(inchans, kqvchans) for _ in range(nheads)])
+        self.vs = nn.ModuleList([nn.Linear(inchans, kqvchans) for _ in range(nheads)])
+        self.sm = nn.Softmax2d()
+
+        self.pheads = nn.Linear(nheads * kqvchans, inchans)
+        self.leaky = nn.LeakyReLU(0.1)
+        self.bn = nn.BatchNorm2d(inchans)
+        self.inchans = inchans
+        self.outchans = inchans
+
+    def forward(self, x):
+
+        pos_encoding = positionalencoding2d(self.inchans, x.shape[-2], x.shape[-1]).to(
+            x.device
+        )
+
+        inshape = x.shape
+        x = x + pos_encoding
+        x = x.flatten(start_dim=-2).permute(0, 2, 1)
+
+        ks = torch.stack([k(x) for k in self.ks]).permute(1, 0, 2, 3)
+        qs = torch.stack([q(x) for q in self.qs]).permute(1, 0, 3, 2)
+        vs = torch.stack([v(x) for v in self.vs]).permute(1, 0, 2, 3)
+
+        kqt = torch.matmul(ks, qs) / ks.shape[-2]
+        sm = self.sm(kqt)
+        att = torch.matmul(sm, vs).permute(0, 2, 3, 1)
+        att = att.flatten(start_dim=-2)
+        projed = self.leaky(self.pheads(att)).permute(0, 2, 1)
+        x = x.reshape(inshape)
+        projed = projed.reshape(inshape)
 
         return self.bn(projed + x)
 
@@ -222,13 +288,13 @@ class Backbone(nn.Module):
                 _, inchans, outchans, ksize, repeats, store = v
                 layers += [ResBlock(inchans, outchans, ksize, repeats, store)]
             elif v[0] == "convformer":
+                # ["convtrans", inchans, kqvchans, kernsize, nheads, store_output]
+                _, inchans, kqvchans, kernsize, nheads, store = v
+                layers += [ConvFormer(inchans, kqvchans, kernsize, nheads, store)]
+            elif v[0] == "transformer":
                 # ["convtrans", inchans, kqvchans, nheads, hiddensize, repeats, store_output]
-                _, inchans, kqvchans, nheads, hiddensize, outchans, repeats, store = v
-                layers += [
-                    ConvFormer(
-                        inchans, kqvchans, nheads, hiddensize, outchans, repeats, store
-                    )
-                ]
+                _, inchans, kqvchans, nheads, store = v
+                layers += [Transformer(inchans, kqvchans, nheads, store)]
 
         self.layers = nn.ModuleList(layers)
 
@@ -250,9 +316,8 @@ class Backbone(nn.Module):
             return
         else:
             x = self.conv_class_layer(x)
-            x = self.rl(x)
             x = torch.mean(x, (-1, -2))
-            x = self.fc(x)
+            x = self.fc1(x)
             if not self.training:
                 x = self.sm(x)
             return x
@@ -262,8 +327,8 @@ class Backbone(nn.Module):
         cls.conv_class_layer = nn.Conv2d(
             cls.layers[-1].outchans, cls.nclasses, 1, padding="same"
         )
-        cls.rl = nn.LeakyReLU()
-        cls.fc = nn.Linear(cls.nclasses, cls.nclasses)
+        cls.rl = nn.LeakyReLU(0.1)
+        cls.fc1 = nn.Linear(cls.nclasses, cls.nclasses)
         cls.sm = nn.Softmax(-1)
 
 
