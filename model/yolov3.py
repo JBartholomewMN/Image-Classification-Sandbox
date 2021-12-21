@@ -123,7 +123,7 @@ class ConvFormer(nn.Module):
         ffed = self.ff1(addnormed)
         ffed = self.leaky(ffed)
         ffed = self.ff2(ffed)
-        ffed = self.ln(xflattened + addnormed)
+        ffed = self.ln(ffed + addnormed)
 
         return ffed.permute(0, 2, 1).reshape(inshape)
 
@@ -146,7 +146,9 @@ class Transformer(nn.Module):
 
         self.pheads = nn.Linear(nheads * kqvchans, inchans)
         self.leaky = nn.LeakyReLU(0.1)
-        self.bn = nn.BatchNorm2d(inchans)
+        self.ln = nn.LayerNorm(inchans)
+        self.ff1 = nn.Linear(inchans, inchans)
+        self.ff2 = nn.Linear(inchans, inchans)
         self.inchans = inchans
         self.outchans = inchans
 
@@ -160,19 +162,29 @@ class Transformer(nn.Module):
         x = x + pos_encoding
         x = x.flatten(start_dim=-2).permute(0, 2, 1)
 
+        # attention
         ks = torch.stack([k(x) for k in self.ks]).permute(1, 0, 2, 3)
         qs = torch.stack([q(x) for q in self.qs]).permute(1, 0, 3, 2)
         vs = torch.stack([v(x) for v in self.vs]).permute(1, 0, 2, 3)
-
         kqt = torch.matmul(ks, qs) / ks.shape[-2]
         sm = self.sm(kqt)
         att = torch.matmul(sm, vs).permute(0, 2, 3, 1)
         att = att.flatten(start_dim=-2)
-        projed = self.leaky(self.pheads(att)).permute(0, 2, 1)
-        x = x.reshape(inshape)
-        projed = projed.reshape(inshape)
+        projed = self.pheads(att)
 
-        return self.bn(projed + x)
+        # add and norm
+        add_and_norm = self.ln(x + projed)
+
+        # feedforward
+        ff = self.ff1(add_and_norm)
+        ff = self.leaky(ff)
+        ff = self.ff2(ff)
+
+        # add and norm
+        ff = self.ln(add_and_norm + ff)
+        ff = ff.permute(0, 2, 1).reshape(inshape)
+
+        return ff
 
 
 class ResBlock(nn.Module):

@@ -63,7 +63,7 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
         print("Epoch Top-1 accuracy: ", acc1)
         print("Epoch Top-%d accuracy: " % cfg["topkaccuracy"], acck)
         print("Best  Top-1 accuracy: ", top1accbest)
-        print("Best Top-%d accuracy: " % cfg["topkaccuracy"], topkaccbest)
+        print("Best  Top-%d accuracy: " % cfg["topkaccuracy"], topkaccbest)
 
 
 if __name__ == "__main__":
