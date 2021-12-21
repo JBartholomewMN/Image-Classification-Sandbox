@@ -57,8 +57,9 @@ CFG = {
     "trainset_args": {"root": "dataset/data/MNISTClassification/", "download": True},
     "trainloader": torch.utils.data.DataLoader,
     "testloader": torch.utils.data.DataLoader,
+    "loss_accumulations": 4,
     "trainloader_args": {
-        "batch_size": 32,
+        "batch_size": 8,
         "shuffle": True,
         "num_workers": 4,
         "collate_fn": collate_fn,
@@ -66,7 +67,7 @@ CFG = {
     },
     "testset_args": {"root": "dataset/data/MNISTClassification/", "train": False},
     "testloader_args": {
-        "batch_size": 32,
+        "batch_size": 8,
         "shuffle": True,
         "num_workers": 4,
         "collate_fn": collate_fn,

@@ -24,20 +24,26 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
 
     for epoch in range(epochs):
         model.train()
+        optimizer.zero_grad()
         for i, (img_batch, label_batch) in enumerate(
             tqdm.tqdm(trainloader, desc=f"Training Epoch {epoch}")
         ):
 
-            optimizer.zero_grad()
             img_batch, label_batch = img_batch.to(device), label_batch.to(device)
 
             predictions = model(img_batch)
 
-            loss = criterion(predictions, label_batch)
+            loss = criterion(predictions, label_batch) / cfg["loss_accumulations"]
             loss.backward()
-            optimizer.step()
 
-            running_loss += loss.item()
+            # weights update
+            if ((i + 1) % cfg["loss_accumulations"] == 0) or (
+                i + 1 == len(trainloader)
+            ):
+                optimizer.step()
+                optimizer.zero_grad()
+
+            running_loss += loss.item() * cfg["loss_accumulations"]
             if i % 100 == 99:
                 print(
                     "[%d, %5d] training loss: %.3f"
