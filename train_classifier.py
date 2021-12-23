@@ -1,12 +1,11 @@
 from typing import Optional
-from model.yolov3 import Backbone
+from model.model import Backbone
 import torch
 import torchvision.transforms.functional as F
 import torchvision.transforms as transforms
 import torch.nn.functional
 import torch.nn as nn
 import tqdm
-from model.eval import _evaluate
 import torchmetrics
 import importlib.util
 import argparse
@@ -65,9 +64,12 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
             top1accbest = acc1
             topkaccbest = acck
             torch.save(model.state_dict(), cfg["weights_save_path"])
-            with open(cfg["weights_save_path"]+".results", "w") as f:
-                f.write(("Best  Top-1 accuracy: %f" % top1accbest) + '\n')
-                f.write(("Best  Top-%d accuracy: %f" % (cfg["topkaccuracy"], topkaccbest)) + '\n')
+            with open(cfg["weights_save_path"] + ".results", "w") as f:
+                f.write(("Best  Top-1 accuracy: %f" % top1accbest) + "\n")
+                f.write(
+                    ("Best  Top-%d accuracy: %f" % (cfg["topkaccuracy"], topkaccbest))
+                    + "\n"
+                )
 
         print("Epoch Top-1 accuracy: ", acc1)
         print("Epoch Top-%d accuracy: " % cfg["topkaccuracy"], acck)

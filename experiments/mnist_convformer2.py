@@ -17,10 +17,43 @@ def collate_fn(batch):
     )
 
 
-# if conv: ["conv", inchans, outchans, ksize, stride]
-# if res: ["res", [inchans...], [outchans...], [ksizes...], repeats, store_output]
-# if convformer: ["convtrans", inchans, kqvchans, kernsize, nheads, store_output]
-# if transformer: ["transformer", in/out chans, kqvchans, nheads, store_output]
+"""
+    Building blocks available to you:
+    --------------------------------------
+    2d convolution, residual block, convolutional transformer, transformer
+
+    To define each, follow these examples.
+
+    2D convolution
+    ------------------------------------------------------------ 
+        3 in channels, 64 out channels, 5 kernel size, 1 stride:
+        Example: ["conv", 3, 64, 5, 1]
+
+
+    Residual Conv Block
+    ------------------------------------------------------------
+        Repeated 8 times:
+            First layer:
+                256 in channels, 512 out channels, 3 kernel size
+            Second layer:
+                512 in channels, 256 out channels, 3 kernel size
+
+        Example: ["res", [256, 512], [512, 256], [3, 3], 8, False]
+
+
+    Convolutional Transformer
+    ------------------------------------------------------------
+        256 in channels, 96 filters for each (k, q, v), kqv kernel size 3, 8 attention heads
+        Example: ["convformer", 256, 96, 3, 8, False]
+
+
+    Convolutional Transformer
+    ------------------------------------------------------------
+        256 in channels, 128 vector size (k, q, v), 8 attention heads
+        Example: ["transformer", 256, 128, 8, False]
+    
+
+"""
 
 CFG = {
     "device": "cuda:0" if torch.cuda.is_available() else "cpu",
@@ -81,6 +114,6 @@ CFG = {
     "topkaccuracy": 2,
     "model": Backbone,
     "model_inits": [Backbone.add_classifier],
-    "weights_save_path": os.path.basename(__file__)+".pt",
+    "weights_save_path": os.path.basename(__file__) + ".pt",
     "criterion": torch.nn.CrossEntropyLoss(),
 }

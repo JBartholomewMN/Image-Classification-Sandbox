@@ -58,9 +58,10 @@ def collate_fn(batch):
 CFG = {
     "device": "cuda" if torch.cuda.is_available() else "cpu",
     "layers": {
-        1: ["conv", 3, 128, 1, 1],
-        2: ["transformer", 128, 128, 8, False],
-        3: ["transformer", 128, 128, 8, False],
+        1: ["conv", 3, 16, 3, 1],
+        2: ["conv", 16, 32, 3, 1],
+        3: ["conv", 32, 64, 3, 2],
+        4: ["conv", 64, 128, 3, 2],
     },
     "size": [28, 28],
     "T_transforms": transforms.Compose(

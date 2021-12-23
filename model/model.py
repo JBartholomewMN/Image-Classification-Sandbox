@@ -43,7 +43,6 @@ def positionalencoding2d(d_model, height, width):
     return pe
 
 
-# ["convtrans", inchans, kqvchans, kernsize, nheads, store_output]
 class ConvFormer(nn.Module):
     def __init__(
         self,
@@ -342,90 +341,3 @@ class Backbone(nn.Module):
         cls.rl = nn.LeakyReLU(0.1)
         cls.fc1 = nn.Linear(cls.nclasses, cls.nclasses)
         cls.sm = nn.Softmax(-1)
-
-
-class YoloV3(nn.Module):
-    def __init__(self, cfg):
-        super(YoloV3, self).__init__()
-
-        self.backbone = Backbone(cfg)
-        self.anchors = torch.tensor(cfg["anchors"]).to(cfg["device"])
-        # build the predictors at different scales.
-        # uses the boolean in res layers from the config file...
-        predictors = list()
-        nchans = 0
-        for l in reversed(
-            list(filter(lambda x: x[0] == "res" and x[-1], cfg["layers"].values()))
-        ):
-            _, _, outchans, _, _, _ = l
-            nchans += outchans[-1]
-            predictors += [
-                ScalePrediction(
-                    nchans, cfg["nclasses"], cfg["nanchors"], cfg["nbbvals"]
-                )
-            ]
-            self.predictors = nn.ModuleList(predictors)
-        print("total parameters: ", sum(p.numel() for p in self.parameters()))
-        print(
-            "trainanble parameters: ",
-            sum(p.numel() for p in self.parameters() if p.requires_grad),
-        )
-
-    def forward(self, x):
-        # get the feature maps from the backbone
-        # arrange them from coarsest spacial to finest spatial
-        # aka deepest to shallowest
-        extractions = reversed(self.backbone(x))
-
-        # put each feature map through a scaled predictor
-        # this is where the upsampling happens for now
-        outputs = list()
-        upsample = nn.Upsample(scale_factor=2)
-        catted = None
-        for ext, pred, anch in zip(extractions, self.predictors, self.anchors):
-
-            if catted is not None:
-                catted = torch.cat((upsample(catted), ext), dim=1)
-            else:
-                catted = ext
-
-            x = pred(catted)
-
-            if not self.training:
-                # sigmoid the x, y (relative to anchor box corner) bounding them from 0 to 1
-                # then move them out of grid space
-                ny, nx = x.shape[2:4]
-                grid = self._make_grid(nx, ny).to(x.device)
-                x[..., 0:2] = torch.sigmoid(x[..., 0:2]) + grid
-                x[..., 0] /= nx
-                x[..., 1] /= ny
-
-                # sigmoid the objectness score [0, 1]
-                x[..., 4] = torch.sigmoid(x[..., 4])
-
-                # exponeniate the h, w scale
-                # then apply the scaling to the anchor boxs
-                x[..., 2:4] = (torch.exp(x[..., 2:4]).movedim(1, -2) * anch).movedim(
-                    -2, 1
-                )
-                x = x.reshape(x.shape[0], -1, x.shape[-1])
-
-            outputs.append(x)
-
-        return torch.cat(outputs, 1) if not self.training else outputs
-
-    @staticmethod
-    def _make_grid(nx=20, ny=20):
-        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)], indexing="ij")
-        return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
-
-
-if __name__ == "__main__":
-    # a little bit of test code
-    model = YoloV3()
-    print(model)
-    model.to("cuda")
-    test_data = torch.randn(10, 3, 416, 416).to("cuda")
-    d = model.forward(test_data)
-    for out in d:
-        print("output_shape:", out.shape)

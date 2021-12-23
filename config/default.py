@@ -5,7 +5,7 @@ import torch
 from torchvision.transforms.transforms import ToTensor
 from dataset.coco_dataset import CocoDetection
 from dataset.imagenet import ImageNetClassifcation
-from model.yolov3 import Backbone
+from model.model import Backbone
 
 
 def collate_fn(batch):
