@@ -17,27 +17,20 @@ def collate_fn(batch):
     )
 
 
+# if conv: ["conv", inchans, outchans, ksize, stride]
+# if res: ["res", [inchans...], [outchans...], [ksizes...], repeats, store_output]
+# if convformer: ["convtrans", inchans, kqvchans, kernsize, nheads, store_output]
+# if transformer: ["transformer", in/out chans, kqvchans, nheads, store_output]
+
 CFG = {
-    "device": "cuda:1" if torch.cuda.is_available() else "cpu",
+    "device": "cuda:0" if torch.cuda.is_available() else "cpu",
     "layers": {
-        # if conv: ["conv", inchans, outchans, ksize, stride]
-        # if res: ["res", [inchans...], [outchans...], [ksizes...], repeats, store_output]
-        # if convtrans: ["convtrans", inchans, kqvchans, nheads, hiddensize, outsize, repeats, store_output]
-        # if transformer: ["transformer", in/out chans, kqvchans, nheads, store_output]
         1: ["conv", 3, 128, 1, 1],
-        2: ["transformer", 128, 128, 8, False],
-        3: ["transformer", 128, 128, 8, False],
+        2: ["convformer", 128, 128, 3, 8, False],
+        3: ["convformer", 128, 128, 3, 8, False],
+        4: ["conv", 128, 256, 4, 2],
+        5: ["convformer", 256, 96, 3, 8, False],
     },
-    "nanchors": 3,
-    "nbbvals": 5,
-    "iou_thresh": 0.5,
-    "conf_thresh": 0.5,
-    "nms_thresh": 0.3,
-    "anchors": [
-        [[0.28, 0.22], [0.38, 0.48], [0.90, 0.78]],
-        [[0.07, 0.15], [0.15, 0.11], [0.14, 0.29]],
-        [[0.02, 0.03], [0.04, 0.07], [0.08, 0.06]],
-    ],
     "size": [28, 28],
     "T_transforms": transforms.Compose(
         [
@@ -61,6 +54,7 @@ CFG = {
         ]
     ),
     "optimizer": torch.optim.Adam,
+    # "optimizer_args": {"lr": 0.01, "momentum": 0.9, "weight_decay": 0.0005},
     "optimizer_args": {"lr": 0.001},
     "dataset": MNISTClassification,
     "trainset_args": {"root": "dataset/data/MNISTClassification/", "download": True},

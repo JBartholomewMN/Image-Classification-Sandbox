@@ -7,6 +7,7 @@ from dataset.coco_dataset import CocoDetection
 from dataset.imagenet import ImageNetClassifcation
 from dataset.MNIST import MNISTClassification
 from model.yolov3 import Backbone
+import os
 
 
 def collate_fn(batch):
@@ -78,6 +79,6 @@ CFG = {
     "topkaccuracy": 2,
     "model": Backbone,
     "model_inits": [Backbone.add_classifier],
-    "weights_save_path": "mnist_convformer.pt",
+    "weights_save_path": os.path.basename(__file__)+".pt",
     "criterion": torch.nn.CrossEntropyLoss(),
 }

@@ -65,6 +65,9 @@ def train(model, optimizer, criterion, trainloader, testloader, epochs, device, 
             top1accbest = acc1
             topkaccbest = acck
             torch.save(model.state_dict(), cfg["weights_save_path"])
+            with open(cfg["weights_save_path"]+".results", "w") as f:
+                f.write(("Best  Top-1 accuracy: %f" % top1accbest) + '\n')
+                f.write(("Best  Top-%d accuracy: %f" % (cfg["topkaccuracy"], topkaccbest)) + '\n')
 
         print("Epoch Top-1 accuracy: ", acc1)
         print("Epoch Top-%d accuracy: " % cfg["topkaccuracy"], acck)

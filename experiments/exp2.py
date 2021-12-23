@@ -121,6 +121,6 @@ CFG = {
     "nclasses": 10,
     "model": Backbone,
     "model_inits": [Backbone.add_classifier],
-    "weights_save_path": "mybest.pt",
+    "weights_save_path": "exp2.pt",
     "criterion": torch.nn.CrossEntropyLoss(),
 }
