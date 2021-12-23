@@ -1,20 +1,42 @@
-# YOLOV3 Pytorch: An Unofficial Implementation
 
-## Infrequently Asked Questions
+# Image Classification Sandbox
 
-### Why do this at all? 
 
-I wanted to write YOLOv3 from scratch to learn the gritty details.
+---
 
-### Who is this for?
+MMF is a modular framework for vision and language multimodal research from Facebook AI Research. MMF contains reference implementations of state-of-the-art vision and language models and has powered multiple research projects at Facebook AI Research. See full list of project inside or built on MMF [here](https://mmf.sh/docs/notes/projects).
 
-Me.
+MMF is powered by PyTorch, allows distributed training and is un-opinionated, scalable and fast. Use MMF to **_bootstrap_** for your next vision and language multimodal research project by following the [installation instructions](https://mmf.sh/docs/). Take a look at list of MMF features [here](https://mmf.sh/docs/getting_started/features).
 
-### Can I use it?
+MMF also acts as **starter codebase** for challenges around vision and
+language datasets (The Hateful Memes, TextVQA, TextCaps and VQA challenges). MMF was formerly known as Pythia. The next video shows an overview of how datasets and models work inside MMF. Checkout MMF's [video overview](https://mmf.sh/docs/getting_started/video_overview).
 
-Yes.
+---
 
-### How do I use it?
+<img src="misc/images/building_blocks.png" width="1000"/>
 
-TBD.
+## Installation
 
+Follow installation instructions in the [documentation](https://mmf.sh/docs/).
+
+## Documentation
+
+Learn more about MMF [here](https://mmf.sh/docs).
+
+## Citation
+
+If you use MMF in your work or use any models published in MMF, please cite:
+
+```bibtex
+@misc{singh2020mmf,
+  author =       {Singh, Amanpreet and Goswami, Vedanuj and Natarajan, Vivek and Jiang, Yu and Chen, Xinlei and Shah, Meet and
+                 Rohrbach, Marcus and Batra, Dhruv and Parikh, Devi},
+  title =        {MMF: A multimodal framework for vision and language research},
+  howpublished = {\url{https://github.com/facebookresearch/mmf}},
+  year =         {2020}
+}
+```
+
+## License
+
+MMF is licensed under BSD license available in [LICENSE](LICENSE) file
