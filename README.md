@@ -32,7 +32,7 @@ __Note:__ Some details are omitted below like batch norms, layer norms, activati
 
 ## Infrequently Asked Questions
 
-1. __Why did you build this?__ I wanted to build an environment where I could experiment with transformers originally, but ended up building out other blocks to have baselines and reference points
+1. __Why did you build this?__ I wanted to build an environment where I could experiment with transformers originally, but ended up building out other blocks to have baselines and reference points. After investing time into this project, I figured I would open it up to anyone else who might benefit.
 2. __Can I use this for whatever?__ Yes, go for it.
 3. __Do the transformers work?__ Yes they do, but it takes a long time to train them, alot of data, and they can be very finnicky. 
 
