@@ -7,7 +7,7 @@
 
 ## Introduction
 
-The Image Classification Sandbox is an environment enabling quick and easy construction of classification networks for experimentation. The Sandbox has 4 building blocks for experimentation including some visual transformers, which can be mixed and matched arbitrarily for a custom network, or assembled to build popular networks (such as Darknet-53). The datasets that are supported are MNIST, ImageNet, and STL10. 
+The Image Classification Sandbox is an environment enabling quick and easy construction of classification networks for experimentation. The Sandbox has 4 building blocks for experimentation __including some visual transformers__, which can be mixed and matched arbitrarily for a custom network, or assembled to build popular networks (such as Darknet-53). The datasets that are supported are MNIST, ImageNet, and STL10. 
 
 ## Try An Experiment
 
@@ -18,7 +18,7 @@ python train_classifier.py --config experiments/mnist_conv_vanilla.py
 
 Let's run a more complex experiment that uses a network with transformers that use convolutions!
 ```
-python train_classifier.py --config experiments/mnist_convformer.py
+python train_classifier.py --config experiments/mnist_convformer2.py
 ```
 
 ---
