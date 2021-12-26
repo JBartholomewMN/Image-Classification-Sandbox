@@ -21,6 +21,8 @@ python train_classifier.py --config experiments/mnist_conv_vanilla.py
 
 If you would like to experiment with your own architecture, you can define your own config.py file. In the 'layers' field, you have 4 choices. No matter how you define your layers, final output is treated as fully convolutional allowing input images of different sizes. The system automatically appends a 1d convolution to get your feature maps down to your number of output classes and then follows it with a 2d global average and a fully connected layer (inspired by Darknet-53).
 
+__Note:__ Some details are omitted below. For example, after 2d convolution there is batch norm and an activation.
+
 <img src="misc/images/building_blocks.png" width="750"/>
 
 ## Infrequently Asked Questions
