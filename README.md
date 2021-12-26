@@ -1,6 +1,8 @@
 
 # Image Classification Sandbox
 
+<img src="misc/images/readme_gif.gif" width="1000"/>
+
 <img src="misc/images/building_blocks.png" width="1000"/>
 ---
 
