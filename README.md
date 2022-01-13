@@ -39,7 +39,7 @@ __Note:__ Some details are omitted below like batch norms, layer norms, activati
 
 ## Citation
 
-If you use ICS in your work or use any models published in MMF, please cite:
+If you use ICS in your work, please cite:
 
 ```bibtex
 @misc{Bartholomew2021ICS,
